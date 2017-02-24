@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/csv"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 
@@ -87,6 +89,8 @@ func main() {
 	projectMaintainers.Org["Curators"] = &Org{}
 	projectMaintainers.Org["Docs maintainers"] = &Org{}
 
+	uniqueMaintainers := map[string]PersonDetails{}
+
 	// parse the MAINTAINERS file for each repo
 	for _, p := range projects {
 		org, project := getProjectOrg(p)
@@ -131,6 +135,19 @@ func main() {
 		for nick, person := range maintainers.People {
 			projectMaintainers.People[strings.ToLower(nick)] = person
 		}
+
+		for _, n := range p.People {
+			if p2, ok := uniqueMaintainers[n]; ok {
+				p2.Projects = append(p2.Projects, project)
+				uniqueMaintainers[n] = p2
+			} else {
+				person := projectMaintainers.People[n]
+				uniqueMaintainers[n] = PersonDetails{
+					Person:   person,
+					Projects: []string{project},
+				}
+			}
+		}
 	}
 
 	projectMaintainers.Org["Curators"].People = removeDuplicates(projectMaintainers.Org["Curators"].People)
@@ -153,6 +170,25 @@ func main() {
 	}
 
 	logrus.Infof("Successfully wrote new combined MAINTAINERS file.")
+
+	w := csv.NewWriter(os.Stdout)
+
+	record := []string{"Name", "Email", "GitHub", "Projects"}
+
+	if err := w.Write(record); err != nil {
+		logrus.Fatalln("error writing record to csv:", err)
+	}
+
+	for _, person := range uniqueMaintainers {
+		sort.Strings(person.Projects)
+		record = []string{person.Name, "<" + person.Email + ">", person.GitHub, strings.Join(person.Projects, ", ")}
+		if err := w.Write(record); err != nil {
+			logrus.Fatalln("error writing record to csv:", err)
+		}
+	}
+
+	w.Flush()
+
 }
 
 func removeDuplicates(slice []string) []string {

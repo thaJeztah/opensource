@@ -32,6 +32,11 @@ type Person struct {
 	GitHub string
 }
 
+type PersonDetails struct {
+	Person
+	Projects []string
+}
+
 // MaintainersDepreciated is an old struct for compatibility
 // with the docker/docker maintainers file.
 // TODO: delete this once the file in docker/docker repo is updated
